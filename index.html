@@ -307,13 +307,17 @@
   <div id="emptyMsg" class="empty" style="display:none;">아직 내역이 없습니다.</div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
-  const STORAGE_KEY = 'ggm-entries';
+  const SUPABASE_URL = 'https://yuspaanfjjstrtofbcsm.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1c3BhYW5mampzdHJ0b2ZiY3NtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0ODAyMjcsImV4cCI6MjA5NzA1NjIyN30.TOeDpc-J7u0-6vydf8XTvWkGiwi_8KcQhT437XyiZq4';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
   const form = document.getElementById('entryForm');
   const list = document.getElementById('list');
   const emptyMsg = document.getElementById('emptyMsg');
 
-  let entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  let entries = [];
 
   document.getElementById('date').valueAsDate = new Date();
 
@@ -321,8 +325,18 @@
   document.getElementById('monthFilter').value =
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-  function save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  async function loadEntries() {
+    const { data, error } = await sb
+      .from('entries')
+      .select('*')
+      .order('date', { ascending: false })
+      .order('id', { ascending: false });
+    if (error) {
+      console.error(error);
+      return;
+    }
+    entries = (data || []).map(e => ({ ...e, amount: Number(e.amount) }));
+    render();
   }
 
   function formatWon(n) {
@@ -448,35 +462,42 @@
     return div.innerHTML;
   }
 
-  form.addEventListener('submit', (ev) => {
+  form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const entry = {
-      id: Date.now(),
       date: document.getElementById('date').value,
       type: document.getElementById('type').value,
       category: document.getElementById('category').value.trim(),
       amount: Number(document.getElementById('amount').value),
       memo: document.getElementById('memo').value.trim()
     };
-    entries.push(entry);
-    save();
-    render();
+    const { error } = await sb.from('entries').insert(entry);
+    if (error) {
+      console.error(error);
+      alert('저장에 실패했습니다.');
+      return;
+    }
+    await loadEntries();
     form.reset();
     document.getElementById('date').valueAsDate = new Date();
   });
 
-  list.addEventListener('click', (ev) => {
+  list.addEventListener('click', async (ev) => {
     const btn = ev.target.closest('button[data-id]');
     if (!btn) return;
     const id = Number(btn.dataset.id);
-    entries = entries.filter(e => e.id !== id);
-    save();
-    render();
+    const { error } = await sb.from('entries').delete().eq('id', id);
+    if (error) {
+      console.error(error);
+      alert('삭제에 실패했습니다.');
+      return;
+    }
+    await loadEntries();
   });
 
   document.getElementById('monthFilter').addEventListener('change', renderMonthlyStats);
 
-  render();
+  loadEntries();
 </script>
 </body>
 </html>
