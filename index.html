@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>간단 가계부</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: linear-gradient(135deg, #fff6d8, #ffe9a6);
+    margin: 0;
+    padding: 20px;
+    color: #333;
+  }
+  .container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    border-top: 6px solid #FFCB05;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .header .pikachu {
+    width: 48px;
+    height: 40px;
+    flex-shrink: 0;
+  }
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    margin: 0;
+  }
+  .summary {
+    display: flex;
+    justify-content: space-between;
+    background: #eef3f8;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+  .summary div { text-align: center; flex: 1; }
+  .summary .label { color: #888; font-size: 12px; margin-bottom: 4px; }
+  .summary .income .value { color: #2b7de9; font-weight: bold; }
+  .summary .expense .value { color: #e9522b; font-weight: bold; }
+  .summary .balance .value { color: #2b9e4a; font-weight: bold; }
+
+  form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  form input, form select, form button {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  form .full { grid-column: 1 / -1; }
+  form button {
+    background: #FFCB05;
+    color: #5a4500;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  form button:hover { background: #ffb700; }
+
+  .section-title {
+    font-size: 15px;
+    font-weight: bold;
+    margin: 24px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .month-picker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .month-picker input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .monthly-summary {
+    display: flex;
+    justify-content: space-between;
+    background: #fff8df;
+    border: 1px solid #ffe69a;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 14px;
+  }
+  .monthly-summary div { text-align: center; flex: 1; }
+  .monthly-summary .label { color: #a08a3c; font-size: 12px; margin-bottom: 4px; }
+  .monthly-summary .income .value { color: #2b7de9; font-weight: bold; }
+  .monthly-summary .expense .value { color: #e9522b; font-weight: bold; }
+  .monthly-summary .balance .value { color: #2b9e4a; font-weight: bold; }
+
+  .category-bar {
+    margin-bottom: 10px;
+  }
+  .category-bar .row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  .category-bar .row .name { font-weight: bold; }
+  .category-bar .track {
+    background: #f0f0f0;
+    border-radius: 6px;
+    height: 10px;
+    overflow: hidden;
+  }
+  .category-bar .fill {
+    height: 100%;
+    background: linear-gradient(90deg, #FFCB05, #FF9C00);
+    border-radius: 6px;
+  }
+
+  .trend-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    height: 160px;
+    padding: 8px 4px 0;
+    overflow-x: auto;
+    border-bottom: 1px solid #eee;
+  }
+  .trend-month {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    min-width: 48px;
+  }
+  .trend-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 120px;
+  }
+  .trend-bar {
+    width: 14px;
+    border-radius: 4px 4px 0 0;
+    min-height: 2px;
+  }
+  .trend-bar.income { background: #2b7de9; }
+  .trend-bar.expense { background: #e9522b; }
+  .trend-label {
+    font-size: 11px;
+    color: #888;
+    margin-top: 6px;
+    white-space: nowrap;
+  }
+  .trend-legend {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    font-size: 12px;
+    color: #888;
+    margin: 10px 0 4px;
+  }
+  .trend-legend .dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th, td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+  }
+  th { color: #888; font-weight: normal; font-size: 12px; }
+  td.amount.income { color: #2b7de9; font-weight: bold; }
+  td.amount.expense { color: #e9522b; font-weight: bold; }
+  td.del {
+    text-align: right;
+  }
+  td.del button {
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  td.del button:hover { color: #e9522b; }
+  .empty {
+    text-align: center;
+    color: #aaa;
+    padding: 24px 0;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <svg class="pikachu" viewBox="0 0 120 100" xmlns="http://www.w3.org/2000/svg">
+      <path d="M30 50 L8 4 L36 34 Z" fill="#FFD23F"/>
+      <path d="M21 17 L8 4 L27 21 Z" fill="#2b2b2b"/>
+      <path d="M90 50 L112 4 L84 34 Z" fill="#FFD23F"/>
+      <path d="M99 17 L112 4 L93 21 Z" fill="#2b2b2b"/>
+      <ellipse cx="60" cy="58" rx="46" ry="38" fill="#FFD23F"/>
+      <circle cx="28" cy="66" r="9" fill="#FF6B6B"/>
+      <circle cx="92" cy="66" r="9" fill="#FF6B6B"/>
+      <ellipse cx="44" cy="52" rx="5" ry="7" fill="#2b2b2b"/>
+      <ellipse cx="76" cy="52" rx="5" ry="7" fill="#2b2b2b"/>
+      <path d="M57 63 L63 63 L60 68 Z" fill="#8B4513"/>
+    </svg>
+    <h1>간단 가계부</h1>
+  </div>
+
+  <div class="summary">
+    <div class="income">
+      <div class="label">수입</div>
+      <div class="value" id="totalIncome">0원</div>
+    </div>
+    <div class="expense">
+      <div class="label">지출</div>
+      <div class="value" id="totalExpense">0원</div>
+    </div>
+    <div class="balance">
+      <div class="label">잔액</div>
+      <div class="value" id="balance">0원</div>
+    </div>
+  </div>
+
+  <form id="entryForm">
+    <input type="date" id="date" required>
+    <select id="type" required>
+      <option value="expense">지출</option>
+      <option value="income">수입</option>
+    </select>
+    <input type="text" id="category" placeholder="카테고리 (예: 식비)" class="full" required>
+    <input type="number" id="amount" placeholder="금액" min="0" required>
+    <input type="text" id="memo" placeholder="메모 (선택)">
+    <button type="submit" class="full">추가하기</button>
+  </form>
+
+  <div class="section-title">📊 월별 통계</div>
+  <div class="month-picker">
+    <input type="month" id="monthFilter">
+  </div>
+  <div class="monthly-summary">
+    <div class="income">
+      <div class="label">수입</div>
+      <div class="value" id="monthIncome">0원</div>
+    </div>
+    <div class="expense">
+      <div class="label">지출</div>
+      <div class="value" id="monthExpense">0원</div>
+    </div>
+    <div class="balance">
+      <div class="label">잔액</div>
+      <div class="value" id="monthBalance">0원</div>
+    </div>
+  </div>
+  <div id="categoryStats"></div>
+  <div id="categoryEmpty" class="empty" style="display:none;">해당 월의 지출 내역이 없습니다.</div>
+
+  <div class="section-title">📈 월별 추이</div>
+  <div id="trendChart" class="trend-chart"></div>
+  <div class="trend-legend">
+    <span><span class="dot" style="background:#2b7de9;"></span>수입</span>
+    <span><span class="dot" style="background:#e9522b;"></span>지출</span>
+  </div>
+  <div id="trendEmpty" class="empty" style="display:none;">내역이 없습니다.</div>
+
+  <div class="section-title">📋 전체 내역</div>
+  <table>
+    <thead>
+      <tr>
+        <th>날짜</th>
+        <th>카테고리</th>
+        <th>메모</th>
+        <th>금액</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="list"></tbody>
+  </table>
+  <div id="emptyMsg" class="empty" style="display:none;">아직 내역이 없습니다.</div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'ggm-entries';
+  const form = document.getElementById('entryForm');
+  const list = document.getElementById('list');
+  const emptyMsg = document.getElementById('emptyMsg');
+
+  let entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+  document.getElementById('date').valueAsDate = new Date();
+
+  const now = new Date();
+  document.getElementById('monthFilter').value =
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }
+
+  function formatWon(n) {
+    return n.toLocaleString('ko-KR') + '원';
+  }
+
+  function render() {
+    list.innerHTML = '';
+    const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+
+    emptyMsg.style.display = sorted.length === 0 ? 'block' : 'none';
+
+    let income = 0, expense = 0;
+    for (const e of entries) {
+      if (e.type === 'income') income += e.amount;
+      else expense += e.amount;
+    }
+
+    document.getElementById('totalIncome').textContent = formatWon(income);
+    document.getElementById('totalExpense').textContent = formatWon(expense);
+    document.getElementById('balance').textContent = formatWon(income - expense);
+
+    for (const e of sorted) {
+      const tr = document.createElement('tr');
+      const sign = e.type === 'income' ? '+' : '-';
+      tr.innerHTML = `
+        <td>${e.date}</td>
+        <td>${escapeHtml(e.category)}</td>
+        <td>${escapeHtml(e.memo || '')}</td>
+        <td class="amount ${e.type}">${sign}${formatWon(e.amount)}</td>
+        <td class="del"><button data-id="${e.id}">✕</button></td>
+      `;
+      list.appendChild(tr);
+    }
+
+    renderMonthlyStats();
+    renderTrendChart();
+  }
+
+  function renderTrendChart() {
+    const chart = document.getElementById('trendChart');
+    const trendEmpty = document.getElementById('trendEmpty');
+    chart.innerHTML = '';
+
+    const months = [...new Set(entries.map(e => e.date.slice(0, 7)))].sort();
+    trendEmpty.style.display = months.length === 0 ? 'block' : 'none';
+    if (months.length === 0) return;
+
+    const monthly = months.map(m => {
+      let income = 0, expense = 0;
+      for (const e of entries) {
+        if (e.date.slice(0, 7) !== m) continue;
+        if (e.type === 'income') income += e.amount;
+        else expense += e.amount;
+      }
+      return { month: m, income, expense };
+    });
+
+    const maxValue = Math.max(1, ...monthly.map(m => Math.max(m.income, m.expense)));
+
+    for (const m of monthly) {
+      const incomeHeight = Math.round((m.income / maxValue) * 120);
+      const expenseHeight = Math.round((m.expense / maxValue) * 120);
+      const label = m.month.slice(5) + '월';
+      const col = document.createElement('div');
+      col.className = 'trend-month';
+      col.title = `${m.month}\n수입: ${formatWon(m.income)}\n지출: ${formatWon(m.expense)}`;
+      col.innerHTML = `
+        <div class="trend-bars">
+          <div class="trend-bar income" style="height:${incomeHeight}px"></div>
+          <div class="trend-bar expense" style="height:${expenseHeight}px"></div>
+        </div>
+        <div class="trend-label">${label}</div>
+      `;
+      chart.appendChild(col);
+    }
+  }
+
+  function renderMonthlyStats() {
+    const month = document.getElementById('monthFilter').value;
+    const monthEntries = entries.filter(e => e.date.startsWith(month));
+
+    let income = 0, expense = 0;
+    const categoryTotals = {};
+    for (const e of monthEntries) {
+      if (e.type === 'income') {
+        income += e.amount;
+      } else {
+        expense += e.amount;
+        categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount;
+      }
+    }
+
+    document.getElementById('monthIncome').textContent = formatWon(income);
+    document.getElementById('monthExpense').textContent = formatWon(expense);
+    document.getElementById('monthBalance').textContent = formatWon(income - expense);
+
+    const categoryStats = document.getElementById('categoryStats');
+    const categoryEmpty = document.getElementById('categoryEmpty');
+    categoryStats.innerHTML = '';
+
+    const sortedCategories = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
+    categoryEmpty.style.display = sortedCategories.length === 0 ? 'block' : 'none';
+
+    for (const [category, total] of sortedCategories) {
+      const percent = expense > 0 ? Math.round((total / expense) * 100) : 0;
+      const bar = document.createElement('div');
+      bar.className = 'category-bar';
+      bar.innerHTML = `
+        <div class="row">
+          <span class="name">${escapeHtml(category)}</span>
+          <span>${formatWon(total)} (${percent}%)</span>
+        </div>
+        <div class="track"><div class="fill" style="width:${percent}%"></div></div>
+      `;
+      categoryStats.appendChild(bar);
+    }
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const entry = {
+      id: Date.now(),
+      date: document.getElementById('date').value,
+      type: document.getElementById('type').value,
+      category: document.getElementById('category').value.trim(),
+      amount: Number(document.getElementById('amount').value),
+      memo: document.getElementById('memo').value.trim()
+    };
+    entries.push(entry);
+    save();
+    render();
+    form.reset();
+    document.getElementById('date').valueAsDate = new Date();
+  });
+
+  list.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-id]');
+    if (!btn) return;
+    const id = Number(btn.dataset.id);
+    entries = entries.filter(e => e.id !== id);
+    save();
+    render();
+  });
+
+  document.getElementById('monthFilter').addEventListener('change', renderMonthlyStats);
+
+  render();
+</script>
+</body>
+</html>
