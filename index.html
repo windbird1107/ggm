@@ -112,6 +112,29 @@
   .monthly-summary .expense .value { color: #e9522b; font-weight: bold; }
   .monthly-summary .balance .value { color: #2b9e4a; font-weight: bold; }
 
+  .month-compare {
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    font-weight: bold;
+  }
+  .month-compare.up {
+    background: #fff0ee;
+    color: #e9522b;
+    border: 1px solid #ffd4cd;
+  }
+  .month-compare.down {
+    background: #eefaf0;
+    color: #2b9e4a;
+    border: 1px solid #cdf0d6;
+  }
+  .month-compare.same {
+    background: #f4f4f4;
+    color: #888;
+    border: 1px solid #e6e6e6;
+  }
+
   .category-bar {
     margin-bottom: 10px;
   }
@@ -186,6 +209,10 @@
     vertical-align: middle;
   }
 
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
   table {
     width: 100%;
     border-collapse: collapse;
@@ -199,6 +226,12 @@
   th { color: #888; font-weight: normal; font-size: 12px; }
   td.amount.income { color: #2b7de9; font-weight: bold; }
   td.amount.expense { color: #e9522b; font-weight: bold; }
+  td.memo {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   td.del {
     text-align: right;
   }
@@ -208,12 +241,45 @@
     color: #aaa;
     cursor: pointer;
     font-size: 16px;
+    padding: 4px 6px;
   }
   td.del button:hover { color: #e9522b; }
   .empty {
     text-align: center;
     color: #aaa;
     padding: 24px 0;
+  }
+
+  @media (max-width: 480px) {
+    body { padding: 10px; }
+    .container { padding: 16px; border-radius: 10px; }
+    .header { gap: 6px; margin-bottom: 12px; }
+    .header .pikachu { width: 38px; height: 32px; }
+    h1 { font-size: 18px; }
+
+    .summary, .monthly-summary {
+      padding: 10px;
+      font-size: 12px;
+    }
+    .summary .value, .monthly-summary .value { font-size: 13px; }
+
+    form {
+      grid-template-columns: 1fr;
+    }
+    form input, form select, form button {
+      font-size: 16px;
+    }
+
+    .section-title { font-size: 14px; margin: 18px 0 10px; }
+
+    .month-picker input { width: 100%; }
+
+    table { font-size: 12px; }
+    th, td { padding: 6px 4px; }
+    td.memo { max-width: 60px; }
+
+    .trend-month { min-width: 38px; }
+    .trend-bar { width: 10px; }
   }
 </style>
 </head>
@@ -280,6 +346,7 @@
       <div class="value" id="monthBalance">0원</div>
     </div>
   </div>
+  <div id="monthCompare" class="month-compare" style="display:none;"></div>
   <div id="categoryStats"></div>
   <div id="categoryEmpty" class="empty" style="display:none;">해당 월의 지출 내역이 없습니다.</div>
 
@@ -292,18 +359,20 @@
   <div id="trendEmpty" class="empty" style="display:none;">내역이 없습니다.</div>
 
   <div class="section-title">📋 전체 내역</div>
-  <table>
-    <thead>
-      <tr>
-        <th>날짜</th>
-        <th>카테고리</th>
-        <th>메모</th>
-        <th>금액</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody id="list"></tbody>
-  </table>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>날짜</th>
+          <th>카테고리</th>
+          <th>메모</th>
+          <th>금액</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="list"></tbody>
+    </table>
+  </div>
   <div id="emptyMsg" class="empty" style="display:none;">아직 내역이 없습니다.</div>
 </div>
 
@@ -365,7 +434,7 @@
       tr.innerHTML = `
         <td>${e.date}</td>
         <td>${escapeHtml(e.category)}</td>
-        <td>${escapeHtml(e.memo || '')}</td>
+        <td class="memo" title="${escapeHtml(e.memo || '')}">${escapeHtml(e.memo || '')}</td>
         <td class="amount ${e.type}">${sign}${formatWon(e.amount)}</td>
         <td class="del"><button data-id="${e.id}">✕</button></td>
       `;
@@ -434,6 +503,8 @@
     document.getElementById('monthExpense').textContent = formatWon(expense);
     document.getElementById('monthBalance').textContent = formatWon(income - expense);
 
+    renderMonthCompare(month, expense);
+
     const categoryStats = document.getElementById('categoryStats');
     const categoryEmpty = document.getElementById('categoryEmpty');
     categoryStats.innerHTML = '';
@@ -453,6 +524,41 @@
         <div class="track"><div class="fill" style="width:${percent}%"></div></div>
       `;
       categoryStats.appendChild(bar);
+    }
+  }
+
+  function renderMonthCompare(month, expense) {
+    const el = document.getElementById('monthCompare');
+
+    const [y, m] = month.split('-').map(Number);
+    let py = y, pm = m - 1;
+    if (pm === 0) { pm = 12; py -= 1; }
+    const prevMonth = `${py}-${String(pm).padStart(2, '0')}`;
+
+    let prevExpense = 0;
+    for (const e of entries) {
+      if (e.date.startsWith(prevMonth) && e.type === 'expense') prevExpense += e.amount;
+    }
+
+    if (expense === 0 && prevExpense === 0) {
+      el.style.display = 'none';
+      return;
+    }
+
+    const diff = expense - prevExpense;
+    el.style.display = 'block';
+
+    if (diff > 0) {
+      const percent = prevExpense > 0 ? Math.round((diff / prevExpense) * 100) : 100;
+      el.className = 'month-compare up';
+      el.textContent = `⚠️ 전월 대비 지출이 ${formatWon(diff)} (${percent}%) 늘었어요. 지출에 주의하세요!`;
+    } else if (diff < 0) {
+      const percent = prevExpense > 0 ? Math.round((-diff / prevExpense) * 100) : 100;
+      el.className = 'month-compare down';
+      el.textContent = `👍 전월 대비 지출이 ${formatWon(-diff)} (${percent}%) 줄었어요. 잘하고 있어요!`;
+    } else {
+      el.className = 'month-compare same';
+      el.textContent = `전월과 지출이 동일합니다.`;
     }
   }
 
